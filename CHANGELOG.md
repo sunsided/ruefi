@@ -3,10 +3,10 @@
 All notable changes to this project will be documented in this file.
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.0] - 2025-10-20
 
-[Unreleased]: https://github.com/sunsided/uefi-experiments/compare/277456229a7d7ab07a82e250b514cb2683432a0c..HEAD
-<!-- [0.1.0]: https://github.com/sunsided/uefi-experiments/releases/tag/v0.1.0 -->
+<!-- [Unreleased]: https://github.com/sunsided/uefi-experiments/compare/277456229a7d7ab07a82e250b514cb2683432a0c..HEAD -->
+[0.1.0]: https://github.com/sunsided/uefi-experiments/releases/tag/v0.1.0
 
 ### Added
 
