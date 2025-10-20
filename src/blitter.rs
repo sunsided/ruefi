@@ -33,7 +33,8 @@ pub fn blit_rgba_to_gop(
                     let r = src_row[x * 4 + 0];
                     let g = src_row[x * 4 + 1];
                     let b = src_row[x * 4 + 2];
-                    if r == 0 && g == 0 && b == 0 {
+                    let a = src_row[x * 4 + 3];
+                    if a == 0 {
                         continue;
                     }
 
@@ -51,7 +52,8 @@ pub fn blit_rgba_to_gop(
                     let r = src_row[x * 4 + 0];
                     let g = src_row[x * 4 + 1];
                     let b = src_row[x * 4 + 2];
-                    if r == 0 && g == 0 && b == 0 {
+                    let a = src_row[x * 4 + 3];
+                    if a == 0 {
                         continue;
                     }
 

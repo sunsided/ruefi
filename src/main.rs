@@ -14,8 +14,6 @@ mod logo {
     include!(concat!(env!("OUT_DIR"), "/assets_gen.rs"));
 }
 
-const DO_GOP: bool = true;
-
 #[entry]
 fn main() -> Status {
     uefi::helpers::init().expect("failed to initialize UEFI");
@@ -38,8 +36,15 @@ fn main() -> Status {
             .expect("failed to write to set colors");
     });
 
+    // TODO: It seems like assuming control over the GOP immediately disables the console.
+    //       We have to write first, then paint.
+    system::with_stdout(|out| {
+        out.output_string(cstr16!("Press any key or wait 5s…\r\n"))
+            .expect("failed to write to stdout");
+    });
+
     // Open GOP (scoped, exclusive)
-    if DO_GOP {
+    {
         let handle =
             boot::get_handle_for_protocol::<GraphicsOutput>().expect("failed to get GOP handle");
         let mut gop =
@@ -50,8 +55,8 @@ fn main() -> Status {
             logo::LOGO_RGBA,
             logo::LOGO_WIDTH,
             logo::LOGO_HEIGHT,
-            150,
-            100,
+            20,
+            20,
         )
         .expect("failed to blit RGBA8");
     }
@@ -62,11 +67,6 @@ fn main() -> Status {
 }
 
 fn wait_for_key() {
-    system::with_stdout(|out| {
-        out.output_string(cstr16!("Press any key or wait 5s…\r\n"))
-            .expect("failed to write to stdout");
-    });
-
     // timer event for 5 seconds (units are 100 ns)
     let timer = unsafe {
         boot::create_event(boot::EventType::TIMER, boot::Tpl::APPLICATION, None, None)

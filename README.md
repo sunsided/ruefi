@@ -21,6 +21,37 @@
 
 Experiments with UEFI.
 
+## Running it
+
+Build a local ESP directory and boot from it:
+
+```shell
+just build && just run-qemu
+```
+
+Alternatively, build an image and boot from it:
+
+```shell
+just build-img && just run-qemu-img
+```
+
+## Example Output
+
+![Screenshot](docs/screenshot.png)
+
+When run with `just run-qemu` (or `just run-qemu -nographic` for headless):
+
+```
+Hello, world from (almost) bare-metal UEFI!
+Press any key or wait 5s…
+
+Timeout reached. Goodbye!
+```
+
+To quit from headless mode, press `Ctrl-A x`. To quit from interactive mode, press `Ctrl-Shift-Q` (
+or `Ctrl-Shift-A` to detach from input capture).
+
+
 ## Setup
 
 ```shell
@@ -43,17 +74,3 @@ With image files:
 Additional commands used internally but provided for convenience:
 
 - `just package`: Package the application into an `esp` partition and prepare UEFI variables; called internally.
-
-## Example Output
-
-When run with `just run-qemu` (or `just run-qemu -nographic` for headless):
-
-```
-Hello, world from (almost) bare-metal UEFI!
-Press any key or wait 5s…
-
-Timeout reached. Goodbye!
-```
-
-To quit from headless mode, press `Ctrl-A x`. To quit from interactive mode, press `Ctrl-Shift-Q` (
-or `Ctrl-Shift-A` to detach from input capture).

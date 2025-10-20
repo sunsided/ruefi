@@ -9,6 +9,8 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Added
 
+- Added naive image rendering via GOP. The reference PNG image is converted to raw RGBA data
+  during build and then rendered to the screen pixel by pixel.
 - Added `Justfile` commands for bundling the UEFI binary into an image file and
   running it off the image in QEMU.
 
