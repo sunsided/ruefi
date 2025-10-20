@@ -2,17 +2,16 @@
 #![no_main]
 
 use uefi::prelude::*;
+use uefi::proto::console::text::Color;
 
 #[entry]
 fn main() -> Status {
     uefi::helpers::init().unwrap();
 
-    // simple console output:
-    uefi::println!("Hello, world from Rust UEFI!");
-
     system::with_stdout(|stdout| {
-        use core::fmt::Write;
-        let _ = writeln!(stdout, "Hello via with_stdout()");
+        stdout.reset(false).unwrap();
+        stdout.set_color(Color::LightRed, Color::Black).unwrap();
+        stdout.output_string(cstr16!("Hello, world from bare-metal UEFI (Rust)!\r\n")).unwrap();
     });
 
     Status::SUCCESS
