@@ -24,12 +24,18 @@ Mapping table
           PciRoot(0x0)/Pci(0x1,0x1)/Ata(0x0)
      BLK2: Alias(s):
           PciRoot(0x0)/Pci(0x1,0x1)/Ata(0x0)
-Press ESC in 1 seconds to skip startup.nsh or any other key to continue.
+Press ESC in 2 seconds to skip startup.nsh or any other key to continue.
 Shell> fs0:
-FS0:\> uefi-experiments.efi
+FS0:\> dir
+Directory of: FS0:\
+10/20/2025  20:22              41,984  experiment.efi
+10/20/2025  20:22             540,672  uefi-vars.fd
+          2 File(s)     582,656 bytes
+          0 Dir(s)
+FS0:\> experiment.efi
 Hello, world from Rust UEFI!
 Hello via with_stdout()
-FS0:\> QEMU: Terminated
+FS0:\> 
 ```
 
 To quit from headless mode, press `Ctrl-A x`. To quit from interactive mode, press `Ctrl-Shift-Q` (

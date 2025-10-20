@@ -8,8 +8,15 @@ ovmf-vars-file := "OVMF_VARS_4M.fd"
 ofmv-code-path := ovmf-dir / ovmf-code-file
 ofmv-vars-path := ovmf-dir / ovmf-vars-file
 
+# Where to package the local development files for QEMU runs.
+uefi-local-dir := "uefi"
+
 # Where to store the local copy of the UEFI vars.
-ofmv-local-vars-file := "uefi-vars.fd"
+ofmv-local-vars-path := uefi-local-dir / "uefi-vars.fd"
+
+# How to rename the example EFI binary for easier access.
+uefi-local-file := "experiment.efi"
+uefi-local-path := uefi-local-dir / uefi-local-file
 
 [private]
 help:
@@ -19,16 +26,29 @@ help:
 find-ovmf:
     fd -HI OVMF_CODE.fd /usr/share 2>/dev/null || find /usr/share -name 'OVMF*.fd'
 
+# Ensures the target directory exists.
+[private]
+_make-target-dir:
+    @mkdir -p {{ uefi-local-dir }}
+
 # Copy the OFMF UEFI vars to the local directory
-reset-uefi-vars:
-    cp "{{ ofmv-vars-path }}" uefi-vars.fd
+reset-uefi-vars: _make-target-dir
+    @rm {{ uefi-local-dir / "*.fd" }} || true
+    @cp "{{ ofmv-vars-path }}" "{{ ofmv-local-vars-path }}"
+    @echo "Updated {{ ofmv-local-vars-path }}"
+
+# Package the build artifacts into the target dir
+package FLAVOR="debug": reset-uefi-vars
+    @rm {{ uefi-local-dir / "*.efi" }} || true
+    @cp "target/x86_64-unknown-uefi/{{ FLAVOR }}/uefi-experiments.efi" "{{ uefi-local-path }}"
+    @echo "Updated {{ uefi-local-path }}"
 
 # Run the firmware in QEMU using OVMF, pass arguments like `-nographic`
-run-qemu *ARGS: reset-uefi-vars
+run-qemu *ARGS: package
     qemu-system-x86_64 \
       -drive "if=pflash,format=raw,readonly=on,file={{ ofmv-code-path }}" \
-      -drive "if=pflash,format=raw,file={{ ofmv-local-vars-file }}" \
-      -drive format=raw,file=fat:rw:target/x86_64-unknown-uefi/debug \
+      -drive "if=pflash,format=raw,file={{ ofmv-local-vars-path }}" \
+      -drive "format=raw,file=fat:rw:{{ uefi-local-dir }}" \
       -net none {{ ARGS }}
 
 # Build for UEFI (see .cargo/config.toml for details)
