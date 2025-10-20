@@ -11,6 +11,9 @@ publish = false
 [dependencies]
 uefi = { version = "0.35", features = ["panic_handler"] }
 
+[build-dependencies]
+image = { version = "0.25.8", default-features = false, features = ["png"] }
+
 [profile.dev]
 panic = "abort"
 

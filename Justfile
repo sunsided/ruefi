@@ -31,6 +31,10 @@ uefi-image-path := build-local-dir / "uefi.img"
 help:
     @just --list --unsorted
 
+# Format the code
+fmt:
+    @cargo fmt --all
+
 # Find the OFMF UEFI firmware for QEMU
 find-ovmf:
     fd -HI OVMF_CODE.fd /usr/share 2>/dev/null || find /usr/share -name 'OVMF*.fd'
@@ -39,6 +43,11 @@ find-ovmf:
 [private]
 _make-target-dir:
     @mkdir -p {{ uefi-local-dir }}
+
+# Clean everything
+clean:
+    @cargo clean
+    rm -rf "{{ build-local-dir }}"
 
 # Copy the OFMF UEFI vars to the local directory
 reset-uefi-vars: _make-target-dir
@@ -53,7 +62,7 @@ package FLAVOR="debug": reset-uefi-vars
     @echo "Updated {{ uefi-local-path }}"
 
 # Build for UEFI (see .cargo/config.toml for details)
-build *ARGS:
+build *ARGS: fmt
     @cargo build {{ ARGS }}
 
 # Build a disk image with ESP

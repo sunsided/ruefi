@@ -1,4 +1,4 @@
-# 🦀🖥️ ~~üfi~~ UEFI
+# 🦀🖥️ Rüfi: UEFI in Rust
 
 <!-- Shields -->
 <p align="left">
