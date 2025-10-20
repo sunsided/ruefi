@@ -1,3 +1,6 @@
+# Defaults (override via env or on the CLI)
+set shell := ["bash", "-cu"]
+
 # These locations and file names vary per distribution.
 # You can try to find them using `just find-ovmf`.
 ovmf-dir := "/usr/share/OVMF"
@@ -9,13 +12,15 @@ ofmv-code-path := ovmf-dir / ovmf-code-file
 ofmv-vars-path := ovmf-dir / ovmf-vars-file
 
 # Where to package the local development files for QEMU runs.
-uefi-local-dir := "uefi"
+build-local-dir := "qemu"
+exp-local-dir := build-local-dir / "esp"
+uefi-local-dir := exp-local-dir / "EFI/Boot"
 
 # Where to store the local copy of the UEFI vars.
-ofmv-local-vars-path := uefi-local-dir / "uefi-vars.fd"
+ofmv-local-vars-path := build-local-dir / "uefi-vars.fd"
 
 # How to rename the example EFI binary for easier access.
-uefi-local-file := "experiment.efi"
+uefi-local-file := "BootX64.efi"
 uefi-local-path := uefi-local-dir / uefi-local-file
 
 [private]
@@ -50,9 +55,9 @@ run-qemu *ARGS: package
       -m 256 \
       -drive "if=pflash,format=raw,readonly=on,file={{ ofmv-code-path }}" \
       -drive "if=pflash,format=raw,file={{ ofmv-local-vars-path }}" \
-      -drive "format=raw,file=fat:rw:{{ uefi-local-dir }}" \
+      -drive "format=raw,file=fat:rw:{{ exp-local-dir }}" \
       -net none {{ ARGS }}
 
 # Build for UEFI (see .cargo/config.toml for details)
 build *ARGS:
-    cargo build {{ ARGS }}
+    @cargo build {{ ARGS }}

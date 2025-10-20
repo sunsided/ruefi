@@ -10,5 +10,7 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- We're now using an `esp` (EFI System Partition) for the UEFI binary to get
+  our EFI application started automatically. The application now waits for 3 seconds before exiting.
 - Added initial console output example.
 - Added `Justfile` for a minimal bootstrap, add example for running UEFI binary in QEMU.
