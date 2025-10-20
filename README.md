@@ -1,4 +1,4 @@
-# üfi
+# 🦀🖥️ ~~üfi~~ UEFI
 
 Experiments with UEFI.
 
