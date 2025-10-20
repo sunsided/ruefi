@@ -11,17 +11,21 @@ ovmf-vars-file := "OVMF_VARS_4M.fd"
 ofmv-code-path := ovmf-dir / ovmf-code-file
 ofmv-vars-path := ovmf-dir / ovmf-vars-file
 
-# Where to package the local development files for QEMU runs.
-build-local-dir := "qemu"
-exp-local-dir := build-local-dir / "esp"
-uefi-local-dir := exp-local-dir / "EFI/Boot"
-
 # Where to store the local copy of the UEFI vars.
 ofmv-local-vars-path := build-local-dir / "uefi-vars.fd"
+
+# Where to package the local development files for QEMU runs.
+build-local-dir := "qemu"
+esp-local-dir := build-local-dir / "esp"
+uefi-local-dir := esp-local-dir / "EFI/Boot"
 
 # How to rename the example EFI binary for easier access.
 uefi-local-file := "BootX64.efi"
 uefi-local-path := uefi-local-dir / uefi-local-file
+
+# Where to store the image
+uefi-image-file := "uefi.img"
+uefi-image-path := build-local-dir / "uefi.img"
 
 [private]
 help:
@@ -48,6 +52,35 @@ package FLAVOR="debug": reset-uefi-vars
     @cp "target/x86_64-unknown-uefi/{{ FLAVOR }}/uefi-experiments.efi" "{{ uefi-local-path }}"
     @echo "Updated {{ uefi-local-path }}"
 
+# Build for UEFI (see .cargo/config.toml for details)
+build *ARGS:
+    @cargo build {{ ARGS }}
+
+# Build a disk image with ESP
+build-img: build package
+    rm "{{ uefi-image-path }}" || true
+
+    # make a 64 MiB raw image
+    truncate -s 64M "{{ uefi-image-path }}"
+
+    # partition + ESP GUID + FAT32 format
+    guestfish -x -a "{{ uefi-image-path }}" -- \
+      run : \
+      part-init /dev/sda gpt : \
+      part-add /dev/sda p 2048 -34 : \
+      part-set-gpt-type /dev/sda 1 c12a7328-f81f-11d2-ba4b-00a0c93ec93b : \
+      mkfs vfat /dev/sda1 label:EFI : \
+      exit
+
+    # Mount ESP and copy BootX64.efi
+    mkdir -p mnt
+    guestmount -a "{{ uefi-image-path }}" -m /dev/sda1 mnt
+    mkdir -p mnt/EFI/Boot
+    cp "{{ uefi-local-path }}" mnt/EFI/Boot/BootX64.efi
+    guestunmount mnt
+    rmdir mnt
+
+
 # Run the firmware in QEMU using OVMF (pass arguments like -nographic)
 run-qemu *ARGS: package
     qemu-system-x86_64 \
@@ -55,9 +88,15 @@ run-qemu *ARGS: package
       -m 256 \
       -drive "if=pflash,format=raw,readonly=on,file={{ ofmv-code-path }}" \
       -drive "if=pflash,format=raw,file={{ ofmv-local-vars-path }}" \
-      -drive "format=raw,file=fat:rw:{{ exp-local-dir }}" \
+      -drive "format=raw,file=fat:rw:{{ esp-local-dir }}" \
       -net none {{ ARGS }}
 
-# Build for UEFI (see .cargo/config.toml for details)
-build *ARGS:
-    @cargo build {{ ARGS }}
+# Run the firmware in QEMU from an image file (created with build-img-x64)
+run-qemu-img *ARGS:
+    qemu-system-x86_64 \
+      -machine q35 \
+      -m 256 \
+      -drive "if=pflash,format=raw,readonly=on,file={{ ofmv-code-path }}" \
+      -drive "if=pflash,format=raw,file={{ ofmv-local-vars-path }}" \
+      -drive "file={{ uefi-image-path }},if=virtio,format=raw" \
+      -net none {{ ARGS }}

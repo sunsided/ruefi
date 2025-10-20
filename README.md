@@ -25,13 +25,20 @@ Experiments with UEFI.
 
 ```shell
 rustup target add x86_64-unknown-uefi
-sudo apt install qemu-system ovmf
+sudo apt install qemu-system ovmf libguestfs-tools
 ```
 
 ## Justfile commands
 
+Running off a directory mount:
+
 - `just build`: Build the application in `debug` flavor
 - `just run-qemu`: Run the application in QEMU`
+
+With image files:
+
+- `just build-img`: Build the application in `release` flavor and create a UEFI image
+- `just run-qemu-img`: Run the application in QEMU from the UEFI image
 
 Additional commands used internally but provided for convenience:
 

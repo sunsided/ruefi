@@ -7,6 +7,11 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 [Unreleased]: https://github.com/sunsided/uefi-experiments/compare/v0.1.0..HEAD
 
+## Added
+
+- Added `Justfile` commands for bundling the UEFI binary into an image file and
+  running it off the image in QEMU.
+
 ## Internal
 
 - Make error handling explicit and more consistent.
