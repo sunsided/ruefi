@@ -1,9 +1,9 @@
 #![no_std]
 #![no_main]
+#![allow(unsafe_code)]
 
 use uefi::prelude::*;
 use uefi::proto::console::text::Color;
-use uefi::table::cfg::ConfigTableEntry;
 
 #[entry]
 fn main() -> Status {
@@ -15,8 +15,37 @@ fn main() -> Status {
         stdout.output_string(cstr16!("Hello, world from bare-metal UEFI (Rust)!\r\n")).unwrap();
     });
 
-    // Sleep 3,000,000 microseconds (i.e., 3 seconds)
-    boot::stall(3_000_000);
+    wait_for_key();
 
     Status::SUCCESS
+}
+
+fn wait_for_key() {
+    system::with_stdout(|out| {
+        let _ = out.output_string(cstr16!("Press any key or wait 5s…\r\n"));
+    });
+
+    // timer event for 5 seconds (units are 100 ns)
+    let timer = unsafe { boot::create_event(boot::EventType::TIMER, boot::Tpl::APPLICATION, None, None).unwrap() };
+    boot::set_timer(&timer, boot::TimerTrigger::Relative(5 * 10_000_000)).unwrap();
+
+    // key event
+    let key_ev = system::with_stdin(|stdin| stdin.wait_for_key_event().unwrap());
+
+    // wait for either event
+    let mut events = [key_ev, timer];
+    let idx = boot::wait_for_event(&mut events).unwrap();
+    match idx {
+        0 => {
+            // index 0: key event fired first
+            let _ = system::with_stdin(|stdin| stdin.read_key());
+        }
+        1 => {
+            // index 1: timer fired first
+            system::with_stdout(|out| {
+                let _ = out.output_string(cstr16!("\r\nTimeout reached. Goodbye!\r\n"));
+            });
+        }
+        _ => unreachable!(),
+    }
 }
