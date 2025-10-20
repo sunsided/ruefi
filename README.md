@@ -1,5 +1,24 @@
 # 🦀🖥️ ~~üfi~~ UEFI
 
+<!-- Shields -->
+<p align="left">
+	<a href="https://www.rust-lang.org/">
+		<img src="https://img.shields.io/badge/Rust-2024-brightgreen.svg?logo=rust" alt="Rust">
+	</a>
+	<a href="https://uefi.org/">
+		<img src="https://img.shields.io/badge/UEFI-Firmware-blue.svg?logo=uefi" alt="UEFI">
+	</a>
+	<a href="https://www.qemu.org/">
+		<img src="https://img.shields.io/badge/QEMU-Emulator-orange.svg?logo=qemu" alt="QEMU">
+	</a>
+	<a href="https://github.com/tianocore/tianocore.github.io/wiki/OVMF">
+		<img src="https://img.shields.io/badge/OVMF-UEFI%20Firmware-yellow.svg?logo=ovmf" alt="OVMF">
+	</a>
+  <a href="https://github.com/rust-secure-code/safety-dance/">
+    <img src="https://img.shields.io/badge/unsafe-allowed-orange.svg" alt="unsafe allowed">
+  </a>
+</p>
+
 Experiments with UEFI.
 
 ## Setup
