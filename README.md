@@ -49,7 +49,7 @@ Additional commands used internally but provided for convenience:
 When run with `just run-qemu` (or `just run-qemu -nographic` for headless):
 
 ```
-Hello, world from bare-metal UEFI (Rust)!
+Hello, world from (almost) bare-metal UEFI!
 Press any key or wait 5s…
 
 Timeout reached. Goodbye!

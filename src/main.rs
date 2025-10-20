@@ -3,19 +3,16 @@
 #![allow(unsafe_code)]
 
 use uefi::prelude::*;
-use uefi::println;
 use uefi::proto::console::text::Color;
 
 #[entry]
 fn main() -> Status {
     uefi::helpers::init().expect("failed to initialize UEFI");
 
-    println!("Hello, world from Rust!");
-
     system::with_stdout(|stdout| {
         stdout.reset(false).expect("failed to write to reset stdout");
         stdout.set_color(Color::LightRed, Color::Black).expect("failed to write to set colors");
-        stdout.output_string(cstr16!("Hello, world from bare-metal UEFI (Rust)!\r\n")).expect("failed to write to stdout");
+        stdout.output_string(cstr16!("Hello, world from (almost) bare-metal UEFI!\r\n")).expect("failed to write to stdout");
     });
 
     wait_for_key();
