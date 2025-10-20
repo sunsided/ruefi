@@ -181,6 +181,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruefi"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "uefi",
+]
+
+[[package]]
 name = "simd-adler32"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -220,14 +228,6 @@ dependencies = [
  "uefi-macros",
  "uefi-raw",
  "uguid",
-]
-
-[[package]]
-name = "uefi-experiments"
-version = "0.1.0"
-dependencies = [
- "image",
- "uefi",
 ]
 
 [[package]]

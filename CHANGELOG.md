@@ -5,7 +5,7 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-[Unreleased]: https://github.com/sunsided/uefi-experiments/compare/v0.1.0..HEAD
+[Unreleased]: https://github.com/sunsided/ruefi/compare/v0.1.0..HEAD
 
 ## Added
 
@@ -20,7 +20,7 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.1.0] - 2025-10-20
 
-[0.1.0]: https://github.com/sunsided/uefi-experiments/releases/tag/v0.1.0
+[0.1.0]: https://github.com/sunsided/ruefi/releases/tag/v0.1.0
 
 ### Added
 

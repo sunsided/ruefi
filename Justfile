@@ -58,7 +58,7 @@ reset-uefi-vars: _make-target-dir
 # Package the build artifacts into the target dir
 package FLAVOR="debug": reset-uefi-vars
     @rm {{ uefi-local-dir / "*.efi" }} || true
-    @cp "target/x86_64-unknown-uefi/{{ FLAVOR }}/uefi-experiments.efi" "{{ uefi-local-path }}"
+    @cp "target/x86_64-unknown-uefi/{{ FLAVOR }}/ruefi.efi" "{{ uefi-local-path }}"
     @echo "Updated {{ uefi-local-path }}"
 
 # Build for UEFI (see .cargo/config.toml for details)
