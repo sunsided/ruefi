@@ -30,3 +30,7 @@ run-qemu *ARGS: reset-uefi-vars
       -drive "if=pflash,format=raw,file={{ ofmv-local-vars-file }}" \
       -drive format=raw,file=fat:rw:target/x86_64-unknown-uefi/debug \
       -net none {{ ARGS }}
+
+# Build for UEFI (see .cargo/config.toml for details)
+build *ARGS:
+    cargo build {{ ARGS }}

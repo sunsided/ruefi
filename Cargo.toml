@@ -8,7 +8,7 @@ categories = ["embedded", "os", "development-tools", "hardware-support"]
 publish = false
 
 [dependencies]
-uefi = "0.35"
+uefi = { version = "0.35", features = ["panic_handler"] }
 
 [profile.dev]
 panic = "abort"

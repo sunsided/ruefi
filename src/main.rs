@@ -17,9 +17,3 @@ fn main() -> Status {
 
     Status::SUCCESS
 }
-
-/// Minimal panic handler: stay put if something goes wrong.
-#[panic_handler]
-fn panic(_info: &core::panic::PanicInfo) -> ! {
-    loop {}
-}
