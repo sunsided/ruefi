@@ -43,9 +43,11 @@ package FLAVOR="debug": reset-uefi-vars
     @cp "target/x86_64-unknown-uefi/{{ FLAVOR }}/uefi-experiments.efi" "{{ uefi-local-path }}"
     @echo "Updated {{ uefi-local-path }}"
 
-# Run the firmware in QEMU using OVMF, pass arguments like `-nographic`
+# Run the firmware in QEMU using OVMF (pass arguments like -nographic)
 run-qemu *ARGS: package
     qemu-system-x86_64 \
+      -machine q35 \
+      -m 256 \
       -drive "if=pflash,format=raw,readonly=on,file={{ ofmv-code-path }}" \
       -drive "if=pflash,format=raw,file={{ ofmv-local-vars-path }}" \
       -drive "format=raw,file=fat:rw:{{ uefi-local-dir }}" \
