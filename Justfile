@@ -89,7 +89,6 @@ build-img: build package
     guestunmount mnt
     rmdir mnt
 
-
 # Run the firmware in QEMU using OVMF (pass arguments like -nographic)
 run-qemu *ARGS: package
     qemu-system-x86_64 \
@@ -109,3 +108,11 @@ run-qemu-img *ARGS:
       -drive "if=pflash,format=raw,file={{ ofmv-local-vars-path }}" \
       -drive "file={{ uefi-image-path }},if=virtio,format=raw" \
       -net none {{ ARGS }}
+
+# Create distributable zip with checksum
+dist: build-img
+    mkdir dist
+    rm -f dist/ruefi.zip dist/ruefi.zip.sha256 || true
+    zip -j dist/ruefi.zip "{{ uefi-image-path }}"
+    cd dist && sha256sum ruefi.zip > ruefi.zip.sha256
+    @echo "Created ruefi.zip and ruefi.zip.sha256"

@@ -2,3 +2,6 @@
 /qemu
 *.fd
 *.efi
+*.zip
+*.zip.sha256
+/dist
