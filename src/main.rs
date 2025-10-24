@@ -252,7 +252,7 @@ fn run_game() -> uefi::Result<()> {
             // Double-buffered rendering: clear backbuffer, compose scene, then flush
             back.clear_bgr(0, 0, 0);
             back.blit_rgba(logo::LOGO_RGBA, logo::LOGO_WIDTH, logo::LOGO_HEIGHT, 10, 10);
-            // Render asteroids as jagged hexagon wireframes
+            // Render asteroids as jagged hexagon wireframes with toroidal wrapping by tiling
             for a in &asteroids {
                 // Precompute cos/sin of base orientation
                 let ca = cosf(a.base_angle);
@@ -264,22 +264,29 @@ fn run_game() -> uefi::Result<()> {
                     // Local coordinates in our basis (X right, Y forward)
                     let lx = -sinf(t) * rr;
                     let ly = cosf(t) * rr;
-                    // Rotate by base_angle and translate to world
+                    // Rotate by base_angle and translate to world (base tile)
                     let x = lx * ca - ly * sa;
                     let y = lx * sa + ly * ca;
                     pts_hex[i] = ((a.x + x) as isize, (a.y + y) as isize);
                 }
-                for i in 0..6 {
-                    let j = (i + 1) % 6;
-                    back.draw_line(
-                        pts_hex[i].0,
-                        pts_hex[i].1,
-                        pts_hex[j].0,
-                        pts_hex[j].1,
-                        200,
-                        200,
-                        200,
-                    );
+                // Draw in a 3x3 neighborhood to emulate wrapping of all vertices/edges
+                let sw_i = sw as isize;
+                let sh_i = sh as isize;
+                for oy in [-sh_i, 0, sh_i] {
+                    for ox in [-sw_i, 0, sw_i] {
+                        for i in 0..6 {
+                            let j = (i + 1) % 6;
+                            back.draw_line(
+                                pts_hex[i].0 + ox,
+                                pts_hex[i].1 + oy,
+                                pts_hex[j].0 + ox,
+                                pts_hex[j].1 + oy,
+                                200,
+                                200,
+                                200,
+                            );
+                        }
+                    }
                 }
             }
 
