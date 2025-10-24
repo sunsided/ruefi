@@ -51,19 +51,19 @@ clean:
 
 # Copy the OFMF UEFI vars to the local directory
 reset-uefi-vars: _make-target-dir
-    @rm {{ uefi-local-dir / "*.fd" }} || true
+    @rm {{ build-local-dir / "*.fd" }} || true
     @cp "{{ ofmv-vars-path }}" "{{ ofmv-local-vars-path }}"
     @echo "Updated {{ ofmv-local-vars-path }}"
 
 # Package the build artifacts into the target dir
-package FLAVOR="debug": reset-uefi-vars
+package FLAVOR="release": reset-uefi-vars
     @rm {{ uefi-local-dir / "*.efi" }} || true
     @cp "target/x86_64-unknown-uefi/{{ FLAVOR }}/ruefi.efi" "{{ uefi-local-path }}"
     @echo "Updated {{ uefi-local-path }}"
 
 # Build for UEFI (see .cargo/config.toml for details)
 build *ARGS: fmt
-    @cargo build {{ ARGS }}
+    @cargo build --release {{ ARGS }}
 
 # Build a disk image with ESP
 build-img: build package

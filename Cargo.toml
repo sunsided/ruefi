@@ -9,7 +9,8 @@ categories = ["embedded", "os", "development-tools", "hardware-support"]
 publish = false
 
 [dependencies]
-uefi = { version = "0.35", features = ["panic_handler"] }
+uefi = { version = "0.35", features = ["panic_handler", "alloc"] }
+libm = "0.2"
 
 [build-dependencies]
 image = { version = "0.25.8", default-features = false, features = ["png"] }

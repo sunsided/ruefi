@@ -13,7 +13,18 @@ fn main() {
         .unwrap()
         .to_rgba8();
     let (w, h) = img.dimensions();
-    let bytes = img.into_raw(); // RGBA8
+    let mut bytes = img.into_raw(); // RGBA8
+
+    // Premultiply alpha towards black: RGB' = RGB * A/255 (leave A unchanged)
+    // This makes simple RGB copying behave like blending over black for semi-transparent pixels.
+    for px in bytes.chunks_mut(4) {
+        // RGBA order
+        let a = px[3] as u16;
+        px[0] = ((px[0] as u16 * a) / 255) as u8; // R'
+        px[1] = ((px[1] as u16 * a) / 255) as u8; // G'
+        px[2] = ((px[2] as u16 * a) / 255) as u8; // B'
+        // px[3] unchanged
+    }
 
     // Write raw bytes for include_bytes!
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
