@@ -1,6 +1,8 @@
 use crate::rand::XorShift64;
 use libm::{cosf, sinf, sqrtf};
 
+extern crate alloc;
+
 /// Asteroid representation: jagged hexagon with per-vertex radial jitter
 pub struct Asteroid {
     pub x: f32,
@@ -10,6 +12,7 @@ pub struct Asteroid {
     pub radius: f32,
     pub base_angle: f32,  // orientation for the hexagon
     pub jitter: [f32; 6], // multiplicative per-vertex radius factors
+    pub split_stage: u8,  // 2 -> splits into 4; 1 -> splits into 2; 0 -> destroyed on hit
 }
 
 impl Asteroid {
@@ -36,6 +39,53 @@ impl Asteroid {
     pub fn mass(&self) -> f32 {
         let r = self.collision_radius();
         r * r
+    }
+
+    /// Spawn child asteroids after a hit, according to split_stage.
+    /// stage 2 -> 4 children, stage 1 -> 2 children, stage 0 -> none.
+    /// Children have half the radius and inherit some of the parent's velocity
+    /// plus a small random variation and offset.
+    pub fn spawn_children(&self, rng: &mut XorShift64) -> alloc::vec::Vec<Asteroid> {
+        let mut out = alloc::vec::Vec::new();
+        if self.split_stage == 0 {
+            return out;
+        }
+        let count = if self.split_stage >= 2 { 4 } else { 2 };
+        let child_stage = self.split_stage - 1;
+        let child_radius = (self.radius * 0.5).max(4.0);
+        for k in 0..count {
+            let base_angle = rng.range_f32(0.0, 2.0 * core::f32::consts::PI);
+            let mut jitter = [1.0f32; 6];
+            for j in 0..6 {
+                jitter[j] = rng.range_f32(0.75, 1.25);
+            }
+            // Velocity: parent's plus a small random kick, and a slight outward bias
+            let dir = if count == 4 {
+                // spread roughly in quadrants
+                base_angle + (k as f32) * (core::f32::consts::PI * 0.5)
+            } else {
+                base_angle + (k as f32) * core::f32::consts::PI
+            };
+            let speed = rng.range_f32(0.8, 2.5);
+            let kick_vx = -sinf(dir) * speed;
+            let kick_vy = cosf(dir) * speed;
+            let vx = self.vx * 0.5 + kick_vx;
+            let vy = self.vy * 0.5 + kick_vy;
+            // Position offset slightly along velocity to avoid immediate re-collision
+            let ox = vx * 0.5;
+            let oy = vy * 0.5;
+            out.push(Asteroid {
+                x: self.x + ox,
+                y: self.y + oy,
+                vx,
+                vy,
+                radius: child_radius,
+                base_angle,
+                jitter,
+                split_stage: child_stage,
+            });
+        }
+        out
     }
 
     /// Create a randomly shaped and placed asteroid, away from the screen center.
@@ -77,6 +127,7 @@ impl Asteroid {
             radius,
             base_angle,
             jitter,
+            split_stage: 2,
         }
     }
 
@@ -201,6 +252,81 @@ impl Asteroid {
                     asteroids[j].vy += imp_y * inv_m2;
                 }
             }
+        }
+    }
+
+    /// Handle projectile vs asteroid collisions and splitting; mutates both lists.
+    /// Uses toroidal shortest-vector distance and collision_radius approximation.
+    pub fn handle_projectile_collisions(
+        asteroids: &mut alloc::vec::Vec<Asteroid>,
+        projectiles: &mut alloc::vec::Vec<crate::projectile::Projectile>,
+        rng: &mut XorShift64,
+        sw: f32,
+        sh: f32,
+    ) {
+        if projectiles.is_empty() || asteroids.is_empty() {
+            return;
+        }
+        let half_w = 0.5 * sw;
+        let half_h = 0.5 * sh;
+        let mut ast_alive: alloc::vec::Vec<bool> = alloc::vec![true; asteroids.len()];
+        let mut proj_alive: alloc::vec::Vec<bool> = alloc::vec![true; projectiles.len()];
+        let mut children: alloc::vec::Vec<Asteroid> = alloc::vec::Vec::new();
+
+        for (pi, p) in projectiles.iter().enumerate() {
+            if !proj_alive[pi] {
+                continue;
+            }
+            for ai in 0..asteroids.len() {
+                if !ast_alive[ai] {
+                    continue;
+                }
+                // shortest delta on torus from projectile to asteroid center
+                let mut dx = asteroids[ai].x - p.x;
+                if dx > half_w {
+                    dx -= sw;
+                } else if dx < -half_w {
+                    dx += sw;
+                }
+                let mut dy = asteroids[ai].y - p.y;
+                if dy > half_h {
+                    dy -= sh;
+                } else if dy < -half_h {
+                    dy += sh;
+                }
+                let r = asteroids[ai].collision_radius();
+                if dx * dx + dy * dy <= r * r {
+                    // hit: mark both dead, spawn children
+                    proj_alive[pi] = false;
+                    let kids = asteroids[ai].spawn_children(rng);
+                    children.extend(kids);
+                    ast_alive[ai] = false;
+                    break; // a projectile hits at most one asteroid
+                }
+            }
+        }
+
+        // Remove dead projectiles
+        if !projectiles.is_empty() {
+            let old = core::mem::take(projectiles);
+            *projectiles = alloc::vec::Vec::with_capacity(old.len());
+            for (i, pr) in old.into_iter().enumerate() {
+                if i < proj_alive.len() && proj_alive[i] {
+                    projectiles.push(pr);
+                }
+            }
+        }
+
+        // Remove dead asteroids and append children
+        if !asteroids.is_empty() {
+            let old = core::mem::take(asteroids);
+            *asteroids = alloc::vec::Vec::with_capacity(old.len() + children.len());
+            for (i, a) in old.into_iter().enumerate() {
+                if i < ast_alive.len() && ast_alive[i] {
+                    asteroids.push(a);
+                }
+            }
+            asteroids.extend(children.into_iter());
         }
     }
 }

@@ -51,7 +51,7 @@ clean:
 
 # Copy the OFMF UEFI vars to the local directory
 reset-uefi-vars: _make-target-dir
-    @rm {{ uefi-local-dir / "*.fd" }} || true
+    @rm {{ build-local-dir / "*.fd" }} || true
     @cp "{{ ofmv-vars-path }}" "{{ ofmv-local-vars-path }}"
     @echo "Updated {{ ofmv-local-vars-path }}"
 
