@@ -3,12 +3,13 @@
 #![allow(unsafe_code)]
 
 mod blitter;
+mod uefi_alloc;
 
-use crate::blitter::{Surface, blit_rgba_to_gop};
+use crate::blitter::BackBuffer;
 use libm::{cosf, sinf};
 use uefi::prelude::*;
 use uefi::proto::console::gop::GraphicsOutput;
-use uefi::proto::console::text::{Color, Key, ScanCode};
+use uefi::proto::console::text::{Key, ScanCode};
 
 mod logo {
     include!(concat!(env!("OUT_DIR"), "/assets_gen.rs"));
@@ -32,19 +33,7 @@ fn run_game() -> uefi::Result<()> {
             .map_err(|_| uefi::Error::new(Status::ABORTED, ()))?;
 
         let (sw, sh) = gop.current_mode_info().resolution();
-        let mut surf = Surface::from_gop(&mut gop);
-
-        // Clear background once to black and draw the logo once
-        surf.clear(0, 0, 0);
-        blit_rgba_to_gop(
-            &mut gop,
-            logo::LOGO_RGBA,
-            logo::LOGO_WIDTH,
-            logo::LOGO_HEIGHT,
-            10,
-            10,
-        )
-        .map_err(|_| uefi::Error::new(Status::ABORTED, ()))?;
+        let mut back = BackBuffer::from_gop(&mut gop);
 
         // Player state
         let mut px = (sw / 2) as f32;
@@ -59,8 +48,6 @@ fn run_game() -> uefi::Result<()> {
         let thrust = 1.5f32; // pixels per frame when holding Up
         let rot_speed = 0.08f32; // radians per keypress frame
 
-        // Keep the previous triangle's vertices for dirty redraw
-        let mut prev_pts: Option<[(isize, isize); 3]> = None;
         // Frame counter to optionally skip input polling every other frame
         let mut frame: u64 = 0;
 
@@ -132,28 +119,13 @@ fn run_game() -> uefi::Result<()> {
                 pts[i] = ((px + x) as isize, (py + y) as isize);
             }
 
-            // Dirty redraw: erase previous triangle by drawing it in black
-            if let Some(p) = prev_pts {
-                surf.draw_triangle_wire(p[0].0, p[0].1, p[1].0, p[1].1, p[2].0, p[2].1, 0, 0, 0);
-            }
-
-            // Draw the new triangle in white
-            surf.draw_triangle_wire(
+            // Double-buffered rendering: clear backbuffer, compose scene, then flush
+            back.clear_rgb(0, 0, 0);
+            back.blit_rgba(logo::LOGO_RGBA, logo::LOGO_WIDTH, logo::LOGO_HEIGHT, 10, 10);
+            back.draw_triangle_wire(
                 pts[0].0, pts[0].1, pts[1].0, pts[1].1, pts[2].0, pts[2].1, 255, 255, 255,
             );
-
-            // Re-draw the logo so it stays visible if the triangle ran over it
-            let _ = blit_rgba_to_gop(
-                &mut gop,
-                logo::LOGO_RGBA,
-                logo::LOGO_WIDTH,
-                logo::LOGO_HEIGHT,
-                10,
-                10,
-            );
-
-            // Store current triangle for next frame's erase pass
-            prev_pts = Some(pts);
+            back.flush_to_gop(&mut gop);
 
             // Simple frame pacing (~60 FPS): stall for ~16 ms to reduce CPU usage and tearing
             boot::stall(16_000);
