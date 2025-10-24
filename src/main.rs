@@ -4,11 +4,11 @@
 
 mod blitter;
 
-use crate::blitter::blit_rgba_to_gop;
-use core::ops::DerefMut;
+use crate::blitter::{Surface, blit_rgba_to_gop};
+use libm::{cosf, sinf};
 use uefi::prelude::*;
 use uefi::proto::console::gop::GraphicsOutput;
-use uefi::proto::console::text::Color;
+use uefi::proto::console::text::{Color, Key, ScanCode};
 
 mod logo {
     include!(concat!(env!("OUT_DIR"), "/assets_gen.rs"));
@@ -17,86 +17,125 @@ mod logo {
 #[entry]
 fn main() -> Status {
     uefi::helpers::init().expect("failed to initialize UEFI");
-
-    system::with_stdout(|stdout| {
-        stdout
-            .reset(false)
-            .expect("failed to write to reset stdout");
-        stdout
-            .enable_cursor(true)
-            .expect("failed to write to set cursor position");
-        stdout
-            .set_color(Color::Black, Color::Red)
-            .expect("failed to write to set colors");
-        stdout
-            .output_string(cstr16!("Hello, world from (almost) bare-metal UEFI!\r\n"))
-            .expect("failed to write to stdout");
-        stdout
-            .set_color(Color::White, Color::Black)
-            .expect("failed to write to set colors");
-    });
-
-    // TODO: It seems like assuming control over the GOP immediately disables the console.
-    //       We have to write first, then paint.
-    system::with_stdout(|out| {
-        out.output_string(cstr16!("Press any key or wait 5s…\r\n"))
-            .expect("failed to write to stdout");
-    });
-
-    // Open GOP (scoped, exclusive)
-    {
-        let handle =
-            boot::get_handle_for_protocol::<GraphicsOutput>().expect("failed to get GOP handle");
-        let mut gop =
-            boot::open_protocol_exclusive::<GraphicsOutput>(handle).expect("failed to open GOP");
-
-        blit_rgba_to_gop(
-            gop.deref_mut(),
-            logo::LOGO_RGBA,
-            logo::LOGO_WIDTH,
-            logo::LOGO_HEIGHT,
-            20,
-            20,
-        )
-        .expect("failed to blit RGBA8");
+    if run_game().is_err() {
+        return Status::ABORTED;
     }
-
-    wait_for_key();
-
     Status::SUCCESS
 }
 
-fn wait_for_key() {
-    // timer event for 5 seconds (units are 100 ns)
-    let timer = unsafe {
-        boot::create_event(boot::EventType::TIMER, boot::Tpl::APPLICATION, None, None)
-            .expect("failed to create timer event")
-    };
-    boot::set_timer(&timer, boot::TimerTrigger::Relative(5 * 10_000_000))
-        .expect("failed to set timer");
+fn run_game() -> uefi::Result<()> {
+    // Open GOP (scoped, exclusive)
+    let handle = boot::get_handle_for_protocol::<GraphicsOutput>()?;
+    let mut gop = boot::open_protocol_exclusive::<GraphicsOutput>(handle)?;
 
-    // key event
-    let key_ev = system::with_stdin(|stdin| {
-        stdin
-            .wait_for_key_event()
-            .expect("failed to wait for key event")
+    // Draw the logo once in the corner so we keep a reference image
+    blit_rgba_to_gop(
+        &mut gop,
+        logo::LOGO_RGBA,
+        logo::LOGO_WIDTH,
+        logo::LOGO_HEIGHT,
+        10,
+        10,
+    )
+    .map_err(|_| uefi::Error::new(Status::ABORTED, ()))?;
+
+    let (sw, sh) = gop.current_mode_info().resolution();
+    let mut surf = Surface::from_gop(&mut gop);
+
+    // Player state
+    let mut px = (sw / 2) as f32;
+    let mut py = (sh / 2) as f32;
+    let mut angle = 0.0f32; // radians; 0 means facing +Y (downwards on screen)
+
+    // Triangle size (in pixels)
+    let tri_h = 24.0f32; // distance from center to nose along forward (Y)
+    let tri_w = 18.0f32; // base width
+
+    let mut speed = 0.0f32;
+    let thrust = 1.5f32; // pixels per frame when holding Up
+    let rot_speed = 0.08f32; // radians per keypress frame
+
+    loop {
+        // Poll keyboard and derive intent for this frame
+        let (rot_dir, thrust_dir, should_exit) = system::with_stdin(|stdin| {
+            let mut rot: i8 = 0;
+            let mut thr: i8 = 0;
+            let mut exit = false;
+            while let Ok(Some(k)) = stdin.read_key() {
+                match k {
+                    Key::Special(ScanCode::LEFT) => rot = -1,
+                    Key::Special(ScanCode::RIGHT) => rot = 1,
+                    Key::Special(ScanCode::UP) => thr = 1,
+                    Key::Special(ScanCode::DOWN) => thr = -1,
+                    Key::Special(ScanCode::ESCAPE) => {
+                        exit = true;
+                    }
+                    _ => {}
+                }
+            }
+            (rot, thr, exit)
+        });
+        if should_exit {
+            break;
+        }
+
+        // Apply rotation and thrust
+        angle += (rot_dir as f32) * rot_speed;
+        if thrust_dir != 0 {
+            speed = (thrust_dir as f32) * thrust;
+        }
+
+        // Integrate movement along forward vector. Coordinate system: X right, Y down (+forward)
+        let fx = -sinf(angle);
+        let fy = cosf(angle);
+        px += fx * speed;
+        py += fy * speed;
+        // Apply a little friction so motion stops if no thrust
+        speed *= 0.85;
+
+        // Keep player on screen (wrap around)
+        if px < 0.0 {
+            px += sw as f32;
+        }
+        if py < 0.0 {
+            py += sh as f32;
+        }
+        if px >= sw as f32 {
+            px -= sw as f32;
+        }
+        if py >= sh as f32 {
+            py -= sh as f32;
+        }
+
+        // Clear screen
+        surf.clear(0, 0, 0);
+
+        // Compute triangle vertices in local space then rotate by angle and translate to (px, py)
+        let half_w = 0.5f32 * tri_w;
+        // local vertices (X right, Y forward): nose at (0, +tri_h), base at y = -tri_h/2
+        let verts = [
+            (0.0f32, tri_h),         // nose
+            (-half_w, -tri_h * 0.5), // left base
+            (half_w, -tri_h * 0.5),  // right base
+        ];
+        let mut pts = [(0isize, 0isize); 3];
+        for (i, (lx, ly)) in verts.iter().enumerate() {
+            let x = lx * cosf(angle) - ly * sinf(angle);
+            let y = lx * sinf(angle) + ly * cosf(angle);
+            pts[i] = ((px + x) as isize, (py + y) as isize);
+        }
+
+        // Draw the wireframe triangle in white
+        surf.draw_triangle_wire(
+            pts[0].0, pts[0].1, pts[1].0, pts[1].1, pts[2].0, pts[2].1, 255, 255, 255,
+        );
+    }
+
+    // On exit, print a message (may or may not be visible depending on GOP/console state)
+    system::with_stdout(|out| {
+        out.output_string(cstr16!("\r\nExiting game. Bye!\r\n"))
+            .ok();
     });
 
-    // wait for either event
-    let mut events = [key_ev, timer];
-    let idx = boot::wait_for_event(&mut events).expect("failed to wait for event");
-    match idx {
-        0 => {
-            // index 0: key event fired first
-            system::with_stdin(|stdin| stdin.read_key()).expect("failed to read key");
-        }
-        1 => {
-            // index 1: timer fired first
-            system::with_stdout(|out| {
-                out.output_string(cstr16!("\r\nTimeout reached. Goodbye!\r\n"))
-                    .expect("failed to write to stdout");
-            });
-        }
-        _ => unreachable!(),
-    }
+    Ok(())
 }

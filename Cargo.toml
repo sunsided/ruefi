@@ -10,6 +10,7 @@ publish = false
 
 [dependencies]
 uefi = { version = "0.35", features = ["panic_handler"] }
+libm = "0.2"
 
 [build-dependencies]
 image = { version = "0.25.8", default-features = false, features = ["png"] }
