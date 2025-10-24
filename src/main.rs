@@ -131,6 +131,9 @@ fn run_game() -> uefi::Result<()> {
                 a.update(sw_f, sh_f);
             }
 
+            // Asteroid-asteroid collisions handled by Asteroid helper
+            Asteroid::resolve_collisions(&mut asteroids, sw_f, sh_f);
+
             // Double-buffered rendering: clear backbuffer, compose scene, then flush
             back.clear_bgr(0, 0, 0);
             back.blit_rgba(logo::LOGO_RGBA, logo::LOGO_WIDTH, logo::LOGO_HEIGHT, 10, 10);
