@@ -4,6 +4,7 @@
 
 mod blitter;
 mod uefi_alloc;
+mod rand;
 
 use crate::blitter::BackBuffer;
 extern crate alloc;
@@ -12,9 +13,21 @@ use libm::{cosf, sinf, sqrtf};
 use uefi::prelude::*;
 use uefi::proto::console::gop::GraphicsOutput;
 use uefi::proto::console::text::{Key, ScanCode};
+use crate::rand::XorShift64;
 
 mod logo {
     include!(concat!(env!("OUT_DIR"), "/assets_gen.rs"));
+}
+
+// Asteroid representation: jagged hexagon with per-vertex radial jitter
+struct Asteroid {
+    x: f32,
+    y: f32,
+    vx: f32,
+    vy: f32,
+    radius: f32,
+    base_angle: f32,  // orientation for the hexagon
+    jitter: [f32; 6], // multiplicative per-vertex radius factors
 }
 
 #[entry]
@@ -36,6 +49,50 @@ fn run_game() -> uefi::Result<()> {
 
         let (sw, sh) = gop.current_mode_info().resolution();
         let mut back = BackBuffer::from_gop(&mut gop);
+
+        // RNG seeded from a timing source
+        let mut rng = XorShift64::default();
+
+        // Asteroids: prepare a few, away from the center
+        let mut asteroids: Vec<Asteroid> = Vec::with_capacity(32);
+        {
+            let cx = (sw / 2) as f32;
+            let cy = (sh / 2) as f32;
+            let min_dist = 120.0f32; // keep spawn away from player start
+            let max_radius = ((sw.min(sh)) as f32) * 0.08 + 12.0;
+            for _ in 0..5 {
+                // pick a position away from the center
+                let (x, y) = loop {
+                    let x = rng.range_f32(0.0, sw as f32);
+                    let y = rng.range_f32(0.0, sh as f32);
+                    let dx = x - cx;
+                    let dy = y - cy;
+                    if dx * dx + dy * dy >= min_dist * min_dist {
+                        break (x, y);
+                    }
+                };
+                let radius = rng.range_f32(18.0, max_radius);
+                // small random velocity, not yet used for movement but stored
+                let speed = rng.range_f32(0.5, 2.0);
+                let dir = rng.range_f32(0.0, 2.0 * core::f32::consts::PI);
+                let vx = -sinf(dir) * speed;
+                let vy = cosf(dir) * speed;
+                let base_angle = rng.range_f32(0.0, 2.0 * core::f32::consts::PI);
+                let mut jitter = [1.0f32; 6];
+                for j in 0..6 {
+                    jitter[j] = rng.range_f32(0.75, 1.25);
+                }
+                asteroids.push(Asteroid {
+                    x,
+                    y,
+                    vx,
+                    vy,
+                    radius,
+                    base_angle,
+                    jitter,
+                });
+            }
+        }
 
         // Player state
         let mut px = (sw / 2) as f32;
@@ -177,6 +234,37 @@ fn run_game() -> uefi::Result<()> {
             // Double-buffered rendering: clear backbuffer, compose scene, then flush
             back.clear_bgr(0, 0, 0);
             back.blit_rgba(logo::LOGO_RGBA, logo::LOGO_WIDTH, logo::LOGO_HEIGHT, 10, 10);
+            // Render asteroids as jagged hexagon wireframes
+            for a in &asteroids {
+                // Precompute cos/sin of base orientation
+                let ca = cosf(a.base_angle);
+                let sa = sinf(a.base_angle);
+                let mut pts_hex = [(0isize, 0isize); 6];
+                for i in 0..6 {
+                    let t = (i as f32) * (core::f32::consts::PI / 3.0);
+                    let rr = a.radius * a.jitter[i];
+                    // Local coordinates in our basis (X right, Y forward)
+                    let lx = -sinf(t) * rr;
+                    let ly = cosf(t) * rr;
+                    // Rotate by base_angle and translate to world
+                    let x = lx * ca - ly * sa;
+                    let y = lx * sa + ly * ca;
+                    pts_hex[i] = ((a.x + x) as isize, (a.y + y) as isize);
+                }
+                for i in 0..6 {
+                    let j = (i + 1) % 6;
+                    back.draw_line(
+                        pts_hex[i].0,
+                        pts_hex[i].1,
+                        pts_hex[j].0,
+                        pts_hex[j].1,
+                        200,
+                        200,
+                        200,
+                    );
+                }
+            }
+
             // Render projectiles as short lines along their velocity direction
             for p in &projectiles {
                 let vlen = sqrtf(p.vx * p.vx + p.vy * p.vy);
