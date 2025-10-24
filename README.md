@@ -35,7 +35,7 @@ Alternatively, build an image and boot from it:
 just build-img && just run-qemu-img
 ```
 
-## Asteroids in UEFI
+## Play Asteroids before booting
 
 ![Screenshot](docs/screenshot.png)
 
