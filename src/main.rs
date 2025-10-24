@@ -28,7 +28,11 @@ fn run_game() -> uefi::Result<()> {
     let handle = boot::get_handle_for_protocol::<GraphicsOutput>()?;
     let mut gop = boot::open_protocol_exclusive::<GraphicsOutput>(handle)?;
 
-    // Draw the logo once in the corner so we keep a reference image
+    let (sw, sh) = gop.current_mode_info().resolution();
+    let mut surf = Surface::from_gop(&mut gop);
+
+    // Clear background once to black and draw the logo once
+    surf.clear(0, 0, 0);
     blit_rgba_to_gop(
         &mut gop,
         logo::LOGO_RGBA,
@@ -38,9 +42,6 @@ fn run_game() -> uefi::Result<()> {
         10,
     )
     .map_err(|_| uefi::Error::new(Status::ABORTED, ()))?;
-
-    let (sw, sh) = gop.current_mode_info().resolution();
-    let mut surf = Surface::from_gop(&mut gop);
 
     // Player state
     let mut px = (sw / 2) as f32;
@@ -54,6 +55,9 @@ fn run_game() -> uefi::Result<()> {
     let mut speed = 0.0f32;
     let thrust = 1.5f32; // pixels per frame when holding Up
     let rot_speed = 0.08f32; // radians per keypress frame
+
+    // Keep the previous triangle's vertices for dirty redraw
+    let mut prev_pts: Option<[(isize, isize); 3]> = None;
 
     loop {
         // Poll keyboard and derive intent for this frame
@@ -107,9 +111,6 @@ fn run_game() -> uefi::Result<()> {
             py -= sh as f32;
         }
 
-        // Clear screen
-        surf.clear(0, 0, 0);
-
         // Compute triangle vertices in local space then rotate by angle and translate to (px, py)
         let half_w = 0.5f32 * tri_w;
         // local vertices (X right, Y forward): nose at (0, +tri_h), base at y = -tri_h/2
@@ -125,10 +126,31 @@ fn run_game() -> uefi::Result<()> {
             pts[i] = ((px + x) as isize, (py + y) as isize);
         }
 
-        // Draw the wireframe triangle in white
+        // Dirty redraw: erase previous triangle by drawing it in black
+        if let Some(p) = prev_pts {
+            surf.draw_triangle_wire(p[0].0, p[0].1, p[1].0, p[1].1, p[2].0, p[2].1, 0, 0, 0);
+        }
+
+        // Draw the new triangle in white
         surf.draw_triangle_wire(
             pts[0].0, pts[0].1, pts[1].0, pts[1].1, pts[2].0, pts[2].1, 255, 255, 255,
         );
+
+        // Re-draw the logo so it stays visible if the triangle ran over it
+        let _ = blit_rgba_to_gop(
+            &mut gop,
+            logo::LOGO_RGBA,
+            logo::LOGO_WIDTH,
+            logo::LOGO_HEIGHT,
+            10,
+            10,
+        );
+
+        // Store current triangle for next frame's erase pass
+        prev_pts = Some(pts);
+
+        // Simple frame pacing (~60 FPS): stall for ~16 ms to reduce CPU usage and tearing
+        unsafe { boot::stall(16_000) };
     }
 
     // On exit, print a message (may or may not be visible depending on GOP/console state)
