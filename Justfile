@@ -63,7 +63,7 @@ package FLAVOR="debug": reset-uefi-vars
 
 # Build for UEFI (see .cargo/config.toml for details)
 build *ARGS: fmt
-    @cargo build {{ ARGS }}
+    @cargo build --release {{ ARGS }}
 
 # Build a disk image with ESP
 build-img: build package
