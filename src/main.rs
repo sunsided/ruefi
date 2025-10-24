@@ -3,17 +3,17 @@
 #![allow(unsafe_code)]
 
 mod blitter;
-mod uefi_alloc;
 mod rand;
+mod uefi_alloc;
 
 use crate::blitter::BackBuffer;
 extern crate alloc;
+use crate::rand::XorShift64;
 use alloc::vec::Vec;
 use libm::{cosf, sinf, sqrtf};
 use uefi::prelude::*;
 use uefi::proto::console::gop::GraphicsOutput;
 use uefi::proto::console::text::{Key, ScanCode};
-use crate::rand::XorShift64;
 
 mod logo {
     include!(concat!(env!("OUT_DIR"), "/assets_gen.rs"));
@@ -215,6 +215,24 @@ fn run_game() -> uefi::Result<()> {
             let sw_f = sw as f32;
             let sh_f = sh as f32;
             projectiles.retain(|p| p.x >= 0.0 && p.x < sw_f && p.y >= 0.0 && p.y < sh_f);
+
+            // Update asteroids: integrate velocity and wrap around screen edges
+            for a in &mut asteroids {
+                a.x += a.vx;
+                a.y += a.vy;
+                if a.x < 0.0 {
+                    a.x += sw_f;
+                }
+                if a.y < 0.0 {
+                    a.y += sh_f;
+                }
+                if a.x >= sw_f {
+                    a.x -= sw_f;
+                }
+                if a.y >= sh_f {
+                    a.y -= sh_f;
+                }
+            }
 
             // Compute triangle vertices in local space then rotate by angle and translate to (px, py)
             let half_w = 0.5f32 * tri_w;
