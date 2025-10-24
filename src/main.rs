@@ -120,7 +120,7 @@ fn run_game() -> uefi::Result<()> {
             }
 
             // Double-buffered rendering: clear backbuffer, compose scene, then flush
-            back.clear_rgb(0, 0, 0);
+            back.clear_bgr(0, 0, 0);
             back.blit_rgba(logo::LOGO_RGBA, logo::LOGO_WIDTH, logo::LOGO_HEIGHT, 10, 10);
             back.draw_triangle_wire(
                 pts[0].0, pts[0].1, pts[1].0, pts[1].1, pts[2].0, pts[2].1, 255, 255, 255,

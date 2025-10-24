@@ -2,6 +2,7 @@ use uefi::proto::console::gop::{GraphicsOutput, PixelFormat};
 
 extern crate alloc;
 use alloc::vec::Vec;
+use core::arch::x86_64::_mm256_mask_sll_epi32;
 
 /// Software back buffer in system memory with the same drawing API
 pub struct BackBuffer {
@@ -40,18 +41,9 @@ impl BackBuffer {
         }
     }
 
+    #[inline]
     pub fn clear_bgr(&mut self, r: u8, g: u8, b: u8) {
-        // Fill line by line in correct pixel order
-        for y in 0..self.height {
-            let row_off = y * self.width * 4;
-            for x in 0..self.width {
-                let p = row_off + x * 4;
-                self.buf[p + 0] = b;
-                self.buf[p + 1] = g;
-                self.buf[p + 2] = r;
-                self.buf[p + 3] = 0;
-            }
-        }
+        self.clear_rgb(b, g, r)
     }
 
     pub fn clear_rgb(&mut self, r: u8, g: u8, b: u8) {
@@ -69,6 +61,11 @@ impl BackBuffer {
     }
 
     #[inline]
+    pub fn put_pixel_bgr(&mut self, x: isize, y: isize, r: u8, g: u8, b: u8) {
+        self.put_pixel_rgb(x, y, b, g, r);
+    }
+
+    #[inline]
     pub fn put_pixel_rgb(&mut self, x: isize, y: isize, r: u8, g: u8, b: u8) {
         if x < 0 || y < 0 {
             return;
@@ -81,22 +78,6 @@ impl BackBuffer {
         self.buf[p + 0] = r;
         self.buf[p + 1] = g;
         self.buf[p + 2] = b;
-        self.buf[p + 3] = 0;
-    }
-
-    #[inline]
-    pub fn put_pixel_bgr(&mut self, x: isize, y: isize, r: u8, g: u8, b: u8) {
-        if x < 0 || y < 0 {
-            return;
-        }
-        let (x, y) = (x as usize, y as usize);
-        if x >= self.width || y >= self.height {
-            return;
-        }
-        let p = y * self.width * 4 + x * 4;
-        self.buf[p + 0] = b;
-        self.buf[p + 1] = g;
-        self.buf[p + 2] = r;
         self.buf[p + 3] = 0;
     }
 
