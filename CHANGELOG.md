@@ -7,6 +7,10 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 [Unreleased]: https://github.com/sunsided/ruefi/compare/v0.2.0..HEAD
 
+## Added
+
+- Added a naive Asteroids-style game.
+
 ## [0.2.0] - 2025-10-21
 
 [0.2.0]: https://github.com/sunsided/ruefi/releases/tag/v0.2.0

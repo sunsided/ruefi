@@ -1,4 +1,5 @@
 use crate::rand::XorShift64;
+use alloc::vec::Vec;
 use libm::{cosf, sinf, sqrtf};
 
 extern crate alloc;
@@ -69,8 +70,8 @@ impl Asteroid {
             let speed = rng.range_f32(0.8, 2.5);
             let kick_vx = -sinf(dir) * speed;
             let kick_vy = cosf(dir) * speed;
-            let vx = self.vx * 0.5 + kick_vx;
-            let vy = self.vy * 0.5 + kick_vy;
+            let vx = self.vx * (2.0f32 / 3.0f32) + kick_vx;
+            let vy = self.vy * (2.0f32 / 3.0f32) + kick_vy;
             // Position offset slightly along velocity to avoid immediate re-collision
             let ox = vx * 0.5;
             let oy = vy * 0.5;
@@ -168,6 +169,7 @@ impl Asteroid {
                 } else if dx < -half_w {
                     dx += sw;
                 }
+
                 let mut dy = asteroids[j].y - asteroids[i].y;
                 if dy > half_h {
                     dy -= sh;
@@ -182,6 +184,7 @@ impl Asteroid {
                 if dist2 >= sum_r * sum_r {
                     continue;
                 }
+
                 let mut dist = sqrtf(dist2);
                 // Avoid divide by zero for identical positions
                 let (nx, ny) = if dist > 1e-5 {
@@ -258,8 +261,8 @@ impl Asteroid {
     /// Handle projectile vs asteroid collisions and splitting; mutates both lists.
     /// Uses toroidal shortest-vector distance and collision_radius approximation.
     pub fn handle_projectile_collisions(
-        asteroids: &mut alloc::vec::Vec<Asteroid>,
-        projectiles: &mut alloc::vec::Vec<crate::projectile::Projectile>,
+        asteroids: &mut Vec<Asteroid>,
+        projectiles: &mut Vec<crate::projectile::Projectile>,
         rng: &mut XorShift64,
         sw: f32,
         sh: f32,
@@ -269,9 +272,9 @@ impl Asteroid {
         }
         let half_w = 0.5 * sw;
         let half_h = 0.5 * sh;
-        let mut ast_alive: alloc::vec::Vec<bool> = alloc::vec![true; asteroids.len()];
-        let mut proj_alive: alloc::vec::Vec<bool> = alloc::vec![true; projectiles.len()];
-        let mut children: alloc::vec::Vec<Asteroid> = alloc::vec::Vec::new();
+        let mut ast_alive: Vec<bool> = alloc::vec![true; asteroids.len()];
+        let mut proj_alive: Vec<bool> = alloc::vec![true; projectiles.len()];
+        let mut children: Vec<Asteroid> = Vec::new();
 
         for (pi, p) in projectiles.iter().enumerate() {
             if !proj_alive[pi] {
@@ -309,7 +312,7 @@ impl Asteroid {
         // Remove dead projectiles
         if !projectiles.is_empty() {
             let old = core::mem::take(projectiles);
-            *projectiles = alloc::vec::Vec::with_capacity(old.len());
+            *projectiles = Vec::with_capacity(old.len());
             for (i, pr) in old.into_iter().enumerate() {
                 if i < proj_alive.len() && proj_alive[i] {
                     projectiles.push(pr);
@@ -320,7 +323,7 @@ impl Asteroid {
         // Remove dead asteroids and append children
         if !asteroids.is_empty() {
             let old = core::mem::take(asteroids);
-            *asteroids = alloc::vec::Vec::with_capacity(old.len() + children.len());
+            *asteroids = Vec::with_capacity(old.len() + children.len());
             for (i, a) in old.into_iter().enumerate() {
                 if i < ast_alive.len() && ast_alive[i] {
                     asteroids.push(a);
