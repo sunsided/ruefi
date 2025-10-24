@@ -37,7 +37,7 @@ impl XorShift64 {
     }
 
     #[inline]
-    pub(crate) fn range_f32(&mut self, min: f32, max: f32) -> f32 {
+    pub fn range_f32(&mut self, min: f32, max: f32) -> f32 {
         min + self.next_f32() * (max - min)
     }
 }

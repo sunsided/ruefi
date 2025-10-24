@@ -1,7 +1,10 @@
 use uefi::proto::console::gop::{GraphicsOutput, PixelFormat};
 
 extern crate alloc;
+use crate::asteroid::Asteroid;
+use crate::ship::Ship;
 use alloc::vec::Vec;
+use libm::{cosf, sinf, sqrtf};
 
 /// Software back buffer in system memory with the same drawing API
 pub struct BackBuffer {
@@ -139,6 +142,102 @@ impl BackBuffer {
         self.draw_line(x0, y0, x1, y1, r, g, b);
         self.draw_line(x1, y1, x2, y2, r, g, b);
         self.draw_line(x2, y2, x0, y0, r, g, b);
+    }
+
+    /// Draw the player ship as a rotated triangle centered at (ship.x, ship.y)
+    #[inline]
+    pub fn draw_ship(&mut self, ship: &Ship, r: u8, g: u8, b: u8) {
+        // Triangle in local space: nose at (0, +tri_h), base at y = -tri_h/2
+        let half_w = 0.5f32 * ship.tri_w;
+        let verts = [
+            (0.0f32, ship.tri_h),         // nose
+            (-half_w, -ship.tri_h * 0.5), // left base
+            (half_w, -ship.tri_h * 0.5),  // right base
+        ];
+        let ca = cosf(ship.angle);
+        let sa = sinf(ship.angle);
+        let mut pts = [(0isize, 0isize); 3];
+        for (i, (lx, ly)) in verts.iter().enumerate() {
+            let x = lx * ca - ly * sa;
+            let y = lx * sa + ly * ca;
+            pts[i] = ((ship.x + x) as isize, (ship.y + y) as isize);
+        }
+        self.draw_triangle_wire(
+            pts[0].0, pts[0].1, pts[1].0, pts[1].1, pts[2].0, pts[2].1, r, g, b,
+        );
+    }
+
+    /// Draw an asteroid as a jagged hexagon with per-vertex jitter and toroidal wrapping (3x3 tiles)
+    pub fn draw_asteroid_wrapped(
+        &mut self,
+        a: &Asteroid,
+        sw: usize,
+        sh: usize,
+        r: u8,
+        g: u8,
+        b: u8,
+    ) {
+        // Precompute cos/sin of base orientation
+        let ca = cosf(a.base_angle);
+        let sa = sinf(a.base_angle);
+
+        // Compute base tile vertices in world space
+        let mut pts_hex = [(0isize, 0isize); 6];
+        for i in 0..6 {
+            let t = (i as f32) * (core::f32::consts::PI / 3.0);
+            let rr = a.radius * a.jitter[i];
+
+            // Local coordinates in our basis (X right, Y forward)
+            let lx = -sinf(t) * rr;
+            let ly = cosf(t) * rr;
+
+            // Rotate by base_angle and translate to world (base tile)
+            let x = lx * ca - ly * sa;
+            let y = lx * sa + ly * ca;
+            pts_hex[i] = ((a.x + x) as isize, (a.y + y) as isize);
+        }
+
+        // Draw in a 3x3 neighborhood to emulate wrapping of all vertices/edges
+        let sw_i = sw as isize;
+        let sh_i = sh as isize;
+        for oy in [-sh_i, 0, sh_i] {
+            for ox in [-sw_i, 0, sw_i] {
+                for i in 0..6 {
+                    let j = (i + 1) % 6;
+                    self.draw_line(
+                        pts_hex[i].0 + ox,
+                        pts_hex[i].1 + oy,
+                        pts_hex[j].0 + ox,
+                        pts_hex[j].1 + oy,
+                        r,
+                        g,
+                        b,
+                    );
+                }
+            }
+        }
+    }
+
+    /// Draw a projectile as a short streak along its velocity direction
+    #[inline]
+    pub fn draw_projectile(
+        &mut self,
+        x: f32,
+        y: f32,
+        vx: f32,
+        vy: f32,
+        len: f32,
+        r: u8,
+        g: u8,
+        b: u8,
+    ) {
+        let vlen = sqrtf(vx * vx + vy * vy);
+        let (tx, ty) = if vlen > 0.0001 {
+            (x - (vx / vlen) * len, y - (vy / vlen) * len)
+        } else {
+            (x, y)
+        };
+        self.draw_line(x as isize, y as isize, tx as isize, ty as isize, r, g, b);
     }
 
     /// Blit an RGBA image into the backbuffer (alpha==0 treated as transparent)
