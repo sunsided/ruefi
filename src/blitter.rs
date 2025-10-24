@@ -2,17 +2,17 @@ use uefi::proto::console::gop::{GraphicsOutput, PixelFormat};
 
 extern crate alloc;
 use alloc::vec::Vec;
-use core::arch::x86_64::_mm256_mask_sll_epi32;
 
 /// Software back buffer in system memory with the same drawing API
 pub struct BackBuffer {
     pub width: usize,
     pub height: usize,
-    fmt: PixelFormat,
     buf: Vec<u8>, // width * height * 4 in GOP-native pixel order
     // Cached GOP framebuffer information to avoid per-frame queries
     dst_ptr: *mut u8,
     dst_pitch: usize, // bytes per scanline in GOP framebuffer
+    // Shuffle function: takes RGB input and returns packed u32 in target pixel order (little-endian)
+    shuffle: fn(r: u8, g: u8, b: u8) -> u32,
 }
 
 impl BackBuffer {
@@ -26,6 +26,13 @@ impl BackBuffer {
         let mut fb = gop.frame_buffer();
         let dst_ptr = fb.as_mut_ptr();
 
+        // Choose shuffle function based on GOP pixel format. Input is RGB.
+        let shuffle: fn(u8, u8, u8) -> u32 = match fmt {
+            PixelFormat::Rgb => Self::pack_rgb as fn(u8, u8, u8) -> u32,
+            PixelFormat::Bgr => Self::pack_bgr as fn(u8, u8, u8) -> u32,
+            _ => Self::pack_rgb as fn(u8, u8, u8) -> u32,
+        };
+
         let len = width * height * bpp;
         let mut buf = Vec::with_capacity(len);
         unsafe {
@@ -34,11 +41,23 @@ impl BackBuffer {
         BackBuffer {
             width,
             height,
-            fmt,
             buf,
             dst_ptr,
             dst_pitch,
+            shuffle,
         }
+    }
+
+    #[inline(always)]
+    const fn pack_rgb(r: u8, g: u8, b: u8) -> u32 {
+        // little-endian bytes: [r, g, b, 0]
+        (r as u32) | ((g as u32) << 8) | ((b as u32) << 16)
+    }
+
+    #[inline(always)]
+    const fn pack_bgr(r: u8, g: u8, b: u8) -> u32 {
+        // little-endian bytes: [b, g, r, 0]
+        (b as u32) | ((g as u32) << 8) | ((r as u32) << 16)
     }
 
     #[inline]
@@ -47,26 +66,19 @@ impl BackBuffer {
     }
 
     pub fn clear_rgb(&mut self, r: u8, g: u8, b: u8) {
-        // Fill line by line in correct pixel order
+        // Fill line by line using shuffle to pack RGB into target order
+        let packed = (self.shuffle)(r, g, b).to_le_bytes();
         for y in 0..self.height {
-            let row_off = y * self.width * 4;
-            for x in 0..self.width {
-                let p = row_off + x * 4;
-                self.buf[p + 0] = r;
-                self.buf[p + 1] = g;
-                self.buf[p + 2] = b;
-                self.buf[p + 3] = 0;
+            let mut p = y * self.width * 4;
+            for _x in 0..self.width {
+                self.buf[p..p + 4].copy_from_slice(&packed);
+                p += 4;
             }
         }
     }
 
     #[inline]
-    pub fn put_pixel_bgr(&mut self, x: isize, y: isize, r: u8, g: u8, b: u8) {
-        self.put_pixel_rgb(x, y, b, g, r);
-    }
-
-    #[inline]
-    pub fn put_pixel_rgb(&mut self, x: isize, y: isize, r: u8, g: u8, b: u8) {
+    pub fn put_pixel(&mut self, x: isize, y: isize, r: u8, g: u8, b: u8) {
         if x < 0 || y < 0 {
             return;
         }
@@ -75,10 +87,8 @@ impl BackBuffer {
             return;
         }
         let p = y * self.width * 4 + x * 4;
-        self.buf[p + 0] = r;
-        self.buf[p + 1] = g;
-        self.buf[p + 2] = b;
-        self.buf[p + 3] = 0;
+        let packed = (self.shuffle)(r, g, b).to_le_bytes();
+        self.buf[p..p + 4].copy_from_slice(&packed);
     }
 
     pub fn draw_line(
@@ -96,40 +106,22 @@ impl BackBuffer {
         let dy = -(y1 - y0).abs();
         let sy = if y0 < y1 { 1 } else { -1 };
         let mut err = dx + dy;
-        match self.fmt {
-            PixelFormat::Rgb => loop {
-                self.put_pixel_rgb(x0, y0, r, g, b);
-                if x0 == x1 && y0 == y1 {
-                    break;
-                }
-                let e2 = 2 * err;
-                if e2 >= dy {
-                    err += dy;
-                    x0 += sx;
-                }
-                if e2 <= dx {
-                    err += dx;
-                    y0 += sy;
-                }
-            },
-            PixelFormat::Bgr => loop {
-                self.put_pixel_bgr(x0, y0, r, g, b);
-                if x0 == x1 && y0 == y1 {
-                    break;
-                }
-                let e2 = 2 * err;
-                if e2 >= dy {
-                    err += dy;
-                    x0 += sx;
-                }
-                if e2 <= dx {
-                    err += dx;
-                    y0 += sy;
-                }
-            },
-            PixelFormat::Bitmask => return,
-            PixelFormat::BltOnly => return,
-        };
+        // Single path: put_pixel_rgb already adapts using the shuffle
+        loop {
+            self.put_pixel(x0, y0, r, g, b);
+            if x0 == x1 && y0 == y1 {
+                break;
+            }
+            let e2 = 2 * err;
+            if e2 >= dy {
+                err += dy;
+                x0 += sx;
+            }
+            if e2 <= dx {
+                err += dx;
+                y0 += sy;
+            }
+        }
     }
 
     pub fn draw_triangle_wire(
@@ -165,21 +157,8 @@ impl BackBuffer {
                     continue;
                 }
                 let p = dst_off + x * 4;
-                match self.fmt {
-                    PixelFormat::Bgr => {
-                        self.buf[p + 0] = b;
-                        self.buf[p + 1] = g;
-                        self.buf[p + 2] = r;
-                        self.buf[p + 3] = 0;
-                    }
-                    PixelFormat::Rgb => {
-                        self.buf[p + 0] = r;
-                        self.buf[p + 1] = g;
-                        self.buf[p + 2] = b;
-                        self.buf[p + 3] = 0;
-                    }
-                    _ => {}
-                }
+                let packed = (self.shuffle)(r, g, b).to_le_bytes();
+                self.buf[p..p + 4].copy_from_slice(&packed);
             }
         }
     }

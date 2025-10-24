@@ -1,9 +1,9 @@
 #![allow(unsafe_code)]
 
 use core::alloc::{GlobalAlloc, Layout};
+use core::ptr;
 use core::ptr::NonNull;
 use core::ptr::null_mut;
-use core::{mem, ptr};
 use uefi::boot;
 
 // We use UEFI Boot Services pool allocation to back Rust's global allocator.
@@ -41,7 +41,9 @@ unsafe impl GlobalAlloc for UefiBootAllocator {
         let aligned = (addr + (align - 1)) & !(align - 1);
         let header_ptr = (aligned - size_of::<usize>()) as *mut usize;
         // Store the original allocation pointer just before the aligned region
-        ptr::write(header_ptr, raw_ptr as usize);
+        unsafe {
+            ptr::write(header_ptr, raw_ptr as usize);
+        }
         aligned as *mut u8
     }
 
@@ -51,15 +53,15 @@ unsafe impl GlobalAlloc for UefiBootAllocator {
         }
         // Recover the original pool pointer from the header we stored in alloc()
         let header_ptr = (ptr as usize - size_of::<usize>()) as *mut usize;
-        let orig_ptr = ptr::read(header_ptr) as *mut u8;
+        let orig_ptr = unsafe { ptr::read(header_ptr) as *mut u8 };
         // SAFETY: `orig_ptr` was returned by `allocate_pool` and stored by us.
-        let _ = boot::free_pool(unsafe { NonNull::new_unchecked(orig_ptr) });
+        let _ = unsafe { boot::free_pool(NonNull::new_unchecked(orig_ptr)) };
     }
 
     unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
-        let p = self.alloc(layout);
+        let p = unsafe { self.alloc(layout) };
         if !p.is_null() {
-            ptr::write_bytes(p, 0, layout.size());
+            unsafe { ptr::write_bytes(p, 0, layout.size()) };
         }
         p
     }
