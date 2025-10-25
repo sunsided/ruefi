@@ -1,5 +1,7 @@
 # 🦀🖥️ Rüfi: UEFI in Rust
 
+_Now with 100% more asteroids!_
+
 <!-- Shields -->
 <p align="left">
 	<a href="https://www.rust-lang.org/">
@@ -17,6 +19,7 @@
   <a href="https://github.com/rust-secure-code/safety-dance/">
     <img src="https://img.shields.io/badge/unsafe-allowed-orange.svg" alt="unsafe allowed">
   </a>
+  <img src="https://img.shields.io/badge/asteroids-at_least_7_included-green.svg" alt="asteroids included">
 </p>
 
 This repository contains a toy project for implementing an [UEFI](https://en.wikipedia.org/wiki/UEFI) application
@@ -67,7 +70,7 @@ sudo apt install qemu-system ovmf libguestfs-tools
 Running off a directory mount:
 
 - `just build`: Build the application in `debug` flavor
-- `just run-qemu`: Run the application in QEMU`
+- `just run-qemu`: Run the application in QEMU
 
 With image files:
 
