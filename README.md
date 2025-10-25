@@ -41,22 +41,19 @@ Alternatively, build an image and boot from it:
 just build-img && just run-qemu-img
 ```
 
-## Example Output
+## Asteroids in UEFI
+
+When run with `just run-qemu`:
 
 ![Screenshot](docs/screenshot.png)
 
-When run with `just run-qemu` (or `just run-qemu -nographic` for headless):
+* Arrow keys for movement
+* Space key for firing
+* Brackets (`[`, `]`) for changing projectile speed
+* ESC to exit to UEFI
 
-```
-Hello, world from (almost) bare-metal UEFI!
-Press any key or wait 5s…
-
-Timeout reached. Goodbye!
-```
-
-To quit from headless mode, press `Ctrl-A x`. To quit from interactive mode, press `Ctrl-Shift-Q` (
-or `Ctrl-Shift-A` to detach from input capture).
-
+To quit from QEMU interactive mode, press `Ctrl-Shift-Q`
+(or `Ctrl-Shift-A` to detach from input capture).
 
 ## Setup
 
