@@ -19,11 +19,17 @@
   </a>
 </p>
 
-Experiments with UEFI.
+This repository contains a toy project for implementing an [UEFI](https://en.wikipedia.org/wiki/UEFI) application
+in Rust mainly by using the [uefi](https://crates.io/crates/uefi) crate. It
+experiments with using the UEFI boot services, specifically the
+Graphics Output Protocol (GOP) and Input devices, and provides
+utility scripts for bundling the binary into an EFI System Partition (ESP)
+or a flashable image. The example can be run directly in QEMU from
+either source.
 
 ## Running it
 
-Build a local ESP directory and boot from it:
+Build a local ESP directory and boot from it using QEMU:
 
 ```shell
 just build && just run-qemu
@@ -35,19 +41,22 @@ Alternatively, build an image and boot from it:
 just build-img && just run-qemu-img
 ```
 
-## Play Asteroids before booting
+## Example Output
 
 ![Screenshot](docs/screenshot.png)
 
-When run with `just run-qemu`:
+When run with `just run-qemu` (or `just run-qemu -nographic` for headless):
 
-* Arrow keys for movement
-* Space key for firing
-* Brackets (`[`, `]`) for changing projectile speed
-* ESC to exit to UEFI
+```
+Hello, world from (almost) bare-metal UEFI!
+Press any key or wait 5s…
 
-To quit from QEMU interactive mode, press `Ctrl-Shift-Q` (
+Timeout reached. Goodbye!
+```
+
+To quit from headless mode, press `Ctrl-A x`. To quit from interactive mode, press `Ctrl-Shift-Q` (
 or `Ctrl-Shift-A` to detach from input capture).
+
 
 ## Setup
 
